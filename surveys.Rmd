@@ -1,0 +1,219 @@
+---
+output:
+  bookdown::html_document2: default
+  html_document: default
+---
+# Introduction
+
+This tutorial offers some advice on what to consider when creating surveys and questionnaires, provides tips on visualizing survey data, and exemplifies how survey and questionnaire data can be analyzed. As this tutorial is introductory, issues relating to what software to use when creating a survey (e.g. SurveyMonkey, Qualtrics, GoogleForms, etc.) or how to program questionnaires or online experiments in Java or R are not discussed. 
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to visualize and analyze survey and questionnaire data using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with surveys and questionnaires. 
+
+  + *Nominal and categorical scales*: 
+Nominal and categorical scales only list the membership of a particular class. Nominal scales offer exactly two options (yes/no or on/off), while categorical scales offer several options (e.g. the state in which someone was born).
+
+  + *Ordinal scales*: 
+With *ordinal scales* it is possible to rank the values, but the distances between the ranks can not be exactly quantified. An example of an ordinal scales is the ranking in a 100-meter run. The 2nd in a 100-meter run did not go twice as fast as the 4th. It is often the case that ordinal variables consist of integer, positive numbers (1, 2, 3, 4, etc.). In the context of surveys, ordinal scales are the most important as all Likert scales (after the psychologist Rensis Likert) are ordinal scales. The levels of the typical five-level Likert item could be: *Strongly disagree (1)*, *Disagree (2) *, *Neither agree nor disagree (3)*, *Agree (4)*, and *Strongly agree (5)*. As such, the Likert scale is a bipolar scale that can be balanced, if there is an uneven number of options with the center option being neutral, or unbalanced, if there are an even number of options which forces respondents to express a preferences for wither of the two poles (this is called a  "forced choice" method.
+
+  + *(True) Numeric scales*: 
+There are two basic types of numeric scales: *interval-scales* and *ratio-scales*. For *interval scales*, the differences between levels are significant, but not the relationship between levels. For instance, 20 degree Celsius is not twice as hot as 10 degree Celsius. For *ratio-scales* both the differences and the relationships between the levels are significant (e.g. the times in a 100-meter dash: 10 is exactly twice as high as 5 and half as much as 20).
+
+Of these scales, numeric is the most informative and questionnaires should always aim to extract the most detailed information without becoming to long.
+
+# Visualizing survey data
+
+Just as the data that is provided by surveys and questionnaires can take various forms, there are numerous ways to display survey data. In the following, we will have a look at some of the most common or useful ways in which survey and questionnaire data can be visualized. However, before we can begin, we need to set up our R session as shown below.
+
+**Preparation and session set up**
+
+To run the scripts shown below without errors, certain *packages* need to be installed from an R *library*. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep_01, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("knitr")
+install.packages("lattice")
+install.packages("tidyverse")
+install.packages("likert")
+install.packages("MASS")
+install.packages("psych")
+install.packages("viridis")
+install.packages("ggplot2")
+install.packages("here")
+install.packages("flextable")
+install.packages("devtools")
+install.packages("rgr")
+install.packages("readxl")
+# devtools::install_github("matherion/userfriendlyscience", dependencies=T)
+install.packages("ufs")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+You can now activate the packages by running the code chunk below. 
+
+```{r prep_02, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
+# install packages
+library(knitr)
+library(lattice)
+library(tidyverse)
+library(likert)
+library(MASS)
+library(psych)
+library(viridis)
+library(ggplot2)
+library(here)
+library(flextable)
+library(devtools)
+library(rgr)
+library(readxl)
+# library(userfriendlyscience)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+
+PIGWEB <- read_excel("PIGWEB FAIR survey (2).xlsx")
+State_of_Open_Data_2021_Master_data_cleaned <- read_excel("State of Open Data 2021_Master data_cleaned.xlsx", skip = 1)
+```
+
+Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
+
+## Line graphs for Likert-scaled data{-}
+
+Line graphs is used when dealing with Likert-scaled variables the line graph displays the density of cumulative frequencies of responses. The difference between the cumulative frequencies of responses displays differences in preferences. Much of the data in this notebook use We will only focus on how to create such graphs using the `ggplot` environment here as it has an in-build function (`ecdf`) which uses the empirical Cumulative Distribution Function and designed to handle such data.
+
+In a first step, we load the Pigweb and State of Open Data 2021 surveys which contains Likert-scaled variables and compare them with each other both visually and statistically test for significant differences in attitudes between the two surveys. The response to the Likert item is numeric so that *strongly disagree/very dissatisfied* would get the lowest (1) and *strongly agree/very satisfied* the highest numeric value (5). The analysis is divided into thematic chunks [list of these] to make it easier to follow the study.
+
+```{r vectors_1, message=FALSE, warning=FALSE}
+# define color vectors
+clrs3 <- c("firebrick4",  "gray70", "darkblue")
+clrs5 <- c("firebrick4", "firebrick1", "gray70", "blue", "darkblue")
+# load data (this is a dataset from a tutorial we used for testing)
+#ldat <- base::readRDS(url("https://slcladal.github.io/data/lid.rda", "rb"))
+```
+
+Let's briefly inspect the `pigweb` and state of Open Science data sets. In the displayed pictures we have added column numbers so that we can use the pictures to find which questions are identifical in the different themes.
+
+```{r preprocess_PigWeb, echo = F}
+pigweb = PIGWEB
+colnumbPig = seq.int(ncol(pigweb))
+colnamePig = colnames(pigweb)
+newnamesPig = paste(colnumbPig, colnamePig)
+pigwebDisp = pigweb
+names(pigwebDisp) = newnamesPig
+pigwebDisp %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the ldat data set.")  %>%
+  flextable::border_outer()
+```
+
+```{r preprocesss_SoD, echo = F}
+sod21 = State_of_Open_Data_2021_Master_data_cleaned
+colnumbSod = seq.int(ncol(sod21))
+colnameSod = colnames(sod21)
+newnamesSod = paste(colnumbSod, colnameSod)
+sod21Disp = sod21
+names(sod21Disp) = newnamesSod
+sod21Disp %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the SoD21 data set.")  %>%
+  flextable::border_outer()
+```
+
+
+This is a pretty big dataset with multiple datastructures so we need to proceed carefully in terms of how we analyse data. We will use a number of different blocks to analyse different kinds of questions. Note: There is a bug creating a comma in numbers of column 11,not sure whyhea
+
+#Information about the research of the respondents
+
+```{r Respondent_data, echo=T, message=FALSE, warning=FALSE}
+
+#Selecting columns from each dataset, harmonising column names and then harmonising response variables.
+respondentsSoD21 = dplyr::select(sod21,10:18)
+respondentsSoD21$source = 'sod'
+respondentsPig = dplyr::select(pigweb,5:7,10:14)
+respondentsPig$source = 'pig'
+outPutNames= c('When was the last occasion that you published or submitted a manuscript to a journal?', 'In which year was your first peer-reviewed research article published?', 'Which of the following best describes your primary area of interest?','Yes, within my institution','Yes, within my country','Yes internationally','No', 'I dont know')
+colnames(respondentsSoD21) = c('Q1', 'Q2', 'Q3','Q4','Q5','Q6','Q7', 'Q8')
+colnames(respondentsPig) = c('Q1', 'Q2', 'Q3','Q4','Q5','Q6','Q7', 'Q8')
+
+#Necessary harmonisation of response formats 
+respondentsPig$Q2=as.numeric(respondentsPig$Q2)
+
+respondentsSod21Pub = subset(respondentsSoD21, !Q2==0)
+ggplot() +
+     geom_step(aes(x = as.numeric(Q2)), data = respondentsSod21Pub, stat = "ecdf") + 
+     geom_step(aes(x = as.numeric(Q2)), data = respondentsPig, stat = "ecdf", color="#c78b90") +
+  scale_x_continuous(limits = c(1990, 2022)) +
+  xlab("Year of first publication by respondent")
+
+
+#gx.ks.test(respondentsSod21Pub$Q2, respondentsPig$Q2, ifresult = FALSE) #Kolmogorov-Smirnov test for Q2
+
+unique(respondentsSoD21)
+respondentsSoD21$Q1 = dplyr::recode(respondentsSoD21$Q1, "Within the last year" = 1, "1-2 years ago" = 2, "3-5 years ago" = 3, "More than 5 years ago" = 4, "I have never submitted a manuscript to a journal" = 5)
+ggplot() +
+     geom_step(aes(x = as.numeric(Q1)), data = respondentsSoD21, stat = "ecdf") + 
+     geom_step(aes(x = as.numeric(Q1)), data = respondentsPig, stat = "ecdf", color="#c78b90") +
+  scale_x_discrete("Time since most recent publication", limits = c("Within the last year", "1-2 years ago", "3-5 years ago", "More than five years ago"))
+
+#ggplot(respondentsSoD21, aes(respondentsSoD21$Q2), xlim(1990,2022)) +
+#  stat_ecdf(geom = "step") +
+#  scale_x_continuous(limits = c(1990, 2022))
+
+#ggplot(respondentsPig, aes(x = as.numeric(respondentsPig$Q2)), #xlim(1990,2022)) +
+#  stat_ecdf(geom = "step") +
+#  scale_x_continuous(limits = c(1990, 2022))
+
+#ggplot(respondentsPig, aes(x=Q1))+stat_ecdf(geom = #"step")+theme_classic()
+```
+
+# Citation & Session Info {-}
+
+This is a heavily modified version of the tutorial
+Schweinberger, Martin. 2020. *Questionnaires and Surveys: Analyses with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/surveys.html (Version 2020.12.11).
+
+```
+@manual{PigWebSurvey,
+  author = {Klingström, Tomas},
+  title = {PigWeb Survey},
+  note = {Not yet public},
+  year = {2022},
+  organization = "Swedish University of Agricultural Sciences},
+  address = {Uppsala},
+  edition = {2022/04/27}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+# References{-}
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
